@@ -46,6 +46,7 @@ $records = $stmt->fetchAll();
             --slate-800: #1e293b;
             --slate-600: #475569;
             --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
             --slate-100: #f1f5f9;
         }
 
@@ -106,7 +107,8 @@ $records = $stmt->fetchAll();
         td {
             padding: 12px 14px;
             text-align: left;
-            border-bottom: 1px solid var(--slate-100);
+            border-bottom: 2px solid var(--slate-400);
+            /* より濃いライン */
             font-size: 0.9rem;
         }
 
@@ -114,6 +116,7 @@ $records = $stmt->fetchAll();
             background: var(--slate-100);
             font-weight: 700;
             color: var(--slate-600);
+            border-bottom: 2px solid var(--slate-400);
         }
 
         tr:last-child td {
@@ -140,11 +143,14 @@ $records = $stmt->fetchAll();
 
         .flag {
             display: inline-block;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 0.7rem;
+            padding: 4px 8px;
+            /* パディング増やす */
+            border-radius: 6px;
+            font-size: 0.85rem;
+            /* フォント大きく */
             font-weight: 700;
             margin-right: 4px;
+            line-height: 1;
         }
 
         .flag-pickup {
@@ -175,12 +181,22 @@ $records = $stmt->fetchAll();
             font-weight: 700;
         }
 
+        /* 過去 */
         .past-row {
-            opacity: 0.5;
+            opacity: 0.6;
+            background: #f1f5f9;
         }
 
-        .today-row {
+        /* 明日（黄色系で強調） */
+        .tomorrow-row {
             background: #fffbeb !important;
+            border-left: 6px solid var(--warning);
+        }
+
+        /* 当日（青系で強調） */
+        .today-row {
+            background: #dbeafe !important;
+            border-left: 6px solid var(--primary);
         }
 
         .empty {
@@ -200,6 +216,14 @@ $records = $stmt->fetchAll();
             .hide-mobile {
                 display: none;
             }
+        }
+
+        .arrow {
+            font-weight: 700;
+            color: var(--slate-400);
+            line-height: 1.2;
+            margin: 2px 0;
+            text-align: center;
         }
     </style>
 </head>
@@ -228,9 +252,21 @@ $records = $stmt->fetchAll();
                 </thead>
                 <tbody>
                     <?php foreach ($records as $row):
-                        $isPast = ($row['target_date'] < $today);
+                        $tomorrow = date('Y-m-d', strtotime('+1 day'));
+
                         $isToday = ($row['target_date'] === $today);
-                        $rowClass = $isPast ? 'past-row' : ($isToday ? 'today-row' : '');
+                        $isTomorrow = ($row['target_date'] === $tomorrow);
+                        $isPast = ($row['target_date'] < $today);
+
+                        // クラス割り当て
+                        $rowClass = '';
+                        if ($isToday) {
+                            $rowClass = 'today-row';
+                        } elseif ($isTomorrow) {
+                            $rowClass = 'tomorrow-row';
+                        } elseif ($isPast) {
+                            $rowClass = 'past-row';
+                        }
 
                         $origDateStr = $row['orig_date'] ? date('n/j', strtotime($row['orig_date'])) : '';
                         $targetDateStr = $row['target_date'] ? date('n/j', strtotime($row['target_date'])) : '-';
@@ -246,11 +282,29 @@ $records = $stmt->fetchAll();
                         ?>
                         <tr class="<?php echo $rowClass; ?>">
                             <td class="date-cell">
-                                <?php if ($origDateStr && $row['event_type'] === '変更'): ?>
-                                    <?php echo $origDateStr; ?>→<?php echo $targetDateStr; ?>
-                                <?php else: ?>
-                                    <?php echo $targetDateStr; ?>
-                                <?php endif; ?>
+                                <?php
+                                $origWd = $row['orig_weekday'] ? '(' . h($row['orig_weekday']) . ')' : '';
+                                $origD = $row['orig_date'] ? date('n/j', strtotime($row['orig_date'])) : '';
+                                $origSch = h($row['orig_schedule'] ?? '');
+
+                                $targetWd = $row['target_weekday'] ? '(' . h($row['target_weekday']) . ')' : '';
+                                $targetD = $row['target_date'] ? date('n/j', strtotime($row['target_date'])) : '';
+
+                                $targetSchVal = $row['new_schedule'] ? $row['new_schedule'] : ($row['orig_schedule'] ?? '');
+                                $targetSch = h($targetSchVal);
+
+                                if ($row['event_type'] === '変更'):
+                                    if ($origD) {
+                                        echo "<div>{$origD}{$origWd}{$origSch}</div>";
+                                    } else {
+                                        echo "<div>{$origSch}</div>";
+                                    }
+                                    echo "<div class='arrow'>↓</div>";
+                                    echo "<div>{$targetD}{$targetWd}{$targetSch}</div>";
+                                else:
+                                    echo "<div>{$targetD}{$targetWd}{$targetSch}</div>";
+                                endif;
+                                ?>
                             </td>
                             <td>
                                 <span class="type-badge"
@@ -262,7 +316,8 @@ $records = $stmt->fetchAll();
                                 <span class="flag <?php echo $needsDropoff ? 'flag-dropoff' : 'flag-off'; ?>">送</span>
                             </td>
                             <td class="hide-mobile">
-                                <?php echo h($row['orig_schedule']); ?>        <?php echo $row['orig_schedule'] ? '→' : ''; ?>        <?php echo h($row['new_schedule']); ?>
+                                <?php echo h($row['orig_schedule']); ?>         <?php echo $row['orig_schedule'] ? '→' : ''; ?>
+                                <?php echo h($row['new_schedule']); ?>
                             </td>
                             <td>
                                 <a href="edit.php?id=<?php echo $row['id']; ?>" class="edit-link">編集</a>

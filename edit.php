@@ -94,8 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isNew) {
         $stmt = $pdo->prepare("INSERT INTO records 
-            (p_name, event_type, orig_date, orig_weekday, orig_schedule, target_date, target_weekday, new_schedule, reason, needs_pickup, needs_dropoff, pickup_time, bed_change, bed_no, bxp_change, exam_change, pharmacy_req, pharmacy_date, created_by, technician, office_staff) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (p_name, event_type, orig_date, orig_weekday, orig_schedule, target_date, target_weekday, new_schedule, reason, needs_pickup, needs_dropoff, pickup_time, bed_change, bed_no, bxp_change, exam_change, pharmacy_req, pharmacy_date, created_by, technician, office_staff, chk_drv1, chk_drv2) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['p_name'],
             $_POST['event_type'],
@@ -117,7 +117,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['pharmacy_date'] ?? '',
             $_POST['created_by'] ?? '',
             $_POST['technician'] ?? '',
-            $_POST['office_staff'] ?? ''
+            $_POST['office_staff'] ?? '',
+            isset($_POST['chk_drv1']) ? 1 : 0,
+            isset($_POST['chk_drv2']) ? 1 : 0
         ]);
     } else {
         $stmt = $pdo->prepare("UPDATE records SET 
@@ -126,7 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             needs_pickup=?, needs_dropoff=?, pickup_time=?,
             bed_change=?, bed_no=?, bxp_change=?, exam_change=?,
             pharmacy_req=?, pharmacy_date=?,
-            created_by=?, technician=?, office_staff=?
+            created_by=?, technician=?, office_staff=?,
+            chk_drv1=?, chk_drv2=?
             WHERE id=?");
         $stmt->execute([
             $_POST['p_name'],
@@ -150,6 +153,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['created_by'] ?? '',
             $_POST['technician'] ?? '',
             $_POST['office_staff'] ?? '',
+            isset($_POST['chk_drv1']) ? 1 : 0,
+            isset($_POST['chk_drv2']) ? 1 : 0,
             $_POST['id']
         ]);
     }
@@ -461,6 +466,51 @@ $pickupTime = $row['pickup_time'] ?? '';
         .staff-section .grid-3 label:first-child {
             margin-top: 0;
         }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 12px;
+            }
+            
+            .card {
+                padding: 16px;
+            }
+
+            /* Make date row more compact */
+            .date-row {
+                grid-template-columns: 1fr 20px 1fr; /* Reduce arrow space */
+                gap: 4px; /* Reduce gap */
+            }
+            
+            .date-row .arrow {
+                font-size: 1rem;
+                padding-bottom: 10px;
+            }
+
+            /* Compact inputs on mobile only in date-row */
+            .date-row input[type="date"],
+            .date-row input[type="time"] {
+                padding: 10px 0px; /* Reduce horizontal padding significantly for date/time row */
+                border-radius: 8px;
+                text-align: center;
+            }
+
+            /* Compact AM/PM buttons */
+            .ampm-btns {
+                gap: 4px;
+            }
+
+            .pickup-time-box input[type="time"] {
+                width: auto !important;
+                max-width: 100%;
+                display: inline-block;
+            }
+            
+            .ampm-btn {
+                padding: 10px 2px;
+                border-radius: 8px;
+            }
+        }
     </style>
 </head>
 
@@ -495,6 +545,20 @@ $pickupTime = $row['pickup_time'] ?? '';
                         <label>📋 医事</label>
                         <input type="text" name="office_staff" value="<?php echo h($row['office_staff'] ?? ''); ?>"
                             placeholder="名前">
+                    </div>
+                </div>
+                
+                <div style="margin-top: 15px; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
+                    <label style="color:#1e40af;">運転手確認</label>
+                    <div class="checkbox-row">
+                        <label class="checkbox-item <?php echo ($row['chk_drv1'] ?? 0) ? 'checked' : ''; ?>">
+                            <input type="checkbox" name="chk_drv1" <?php echo ($row['chk_drv1'] ?? 0) ? 'checked' : ''; ?>
+                                onchange="this.parentNode.classList.toggle('checked', this.checked)"> 西
+                        </label>
+                        <label class="checkbox-item <?php echo ($row['chk_drv2'] ?? 0) ? 'checked' : ''; ?>">
+                            <input type="checkbox" name="chk_drv2" <?php echo ($row['chk_drv2'] ?? 0) ? 'checked' : ''; ?>
+                                onchange="this.parentNode.classList.toggle('checked', this.checked)"> 佐藤
+                        </label>
                     </div>
                 </div>
             </div>

@@ -181,6 +181,23 @@ $records = $pdo->query($sql)->fetchAll();
                 padding: 4px 8px;
             }
         }
+
+        .arrow {
+            font-weight: 700;
+            color: var(--slate-400);
+            line-height: 1.2;
+            margin: 2px 0;
+            text-align: center;
+        }
+
+        .check-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
     </style>
 </head>
 
@@ -204,8 +221,6 @@ $records = $pdo->query($sql)->fetchAll();
                         <th>種別</th>
                         <th>患者名</th>
                         <th>迎え時間</th>
-                        <th>運①</th>
-                        <th>運②</th>
                         <th class="hide-mobile">備考</th>
                         <th class="hide-mobile">担当</th>
                     </tr>
@@ -231,18 +246,36 @@ $records = $pdo->query($sql)->fetchAll();
                         $officeStaff = $row['office_staff'] ?? '';
                         ?>
                         <tr>
-                            <td class="date-cell"><?php echo $targetDateStr; ?></td>
+                            <td class="date-cell">
+                                <?php
+                                $origWd = $row['orig_weekday'] ? '(' . h($row['orig_weekday']) . ')' : '';
+                                $origD = $row['orig_date'] ? date('n/j', strtotime($row['orig_date'])) : '';
+                                $origSch = h($row['orig_schedule'] ?? '');
+
+                                $targetWd = $row['target_weekday'] ? '(' . h($row['target_weekday']) . ')' : '';
+                                $targetD = $row['target_date'] ? date('n/j', strtotime($row['target_date'])) : '';
+
+                                $targetSchVal = $row['new_schedule'] ? $row['new_schedule'] : ($row['orig_schedule'] ?? '');
+                                $targetSch = h($targetSchVal);
+
+                                if ($row['event_type'] === '変更'):
+                                    if ($origD) {
+                                        echo "<div>{$origD}{$origWd}{$origSch}</div>";
+                                    } else {
+                                        echo "<div>{$origSch}</div>";
+                                    }
+                                    echo "<div class='arrow'>↓</div>";
+                                    echo "<div>{$targetD}{$targetWd}{$targetSch}</div>";
+                                else:
+                                    echo "<div>{$targetD}{$targetWd}{$targetSch}</div>";
+                                endif;
+                                ?>
+                            </td>
                             <td><span class="type-badge"
                                     style="background:<?php echo $badgeColor; ?>;"><?php echo h($row['event_type']); ?></span>
                             </td>
                             <td class="name-cell"><?php echo h($row['p_name']); ?></td>
                             <td><?php echo h($row['pickup_time'] ?? '-'); ?></td>
-                            <td class="<?php echo $chkDrv1 ? 'check-done' : 'check-none'; ?>">
-                                <?php echo $chkDrv1 ? '✓' : '-'; ?>
-                            </td>
-                            <td class="<?php echo $chkDrv2 ? 'check-done' : 'check-none'; ?>">
-                                <?php echo $chkDrv2 ? '✓' : '-'; ?>
-                            </td>
                             <td class="hide-mobile" style="font-size:0.75rem; color:var(--slate-600);">
                                 <?php echo h($row['reason'] ?? ''); ?>
                             </td>

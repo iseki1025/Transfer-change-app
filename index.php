@@ -1,6 +1,6 @@
 <?php
 /**
- * 透析・送迎管理システム - トップページ（今日以降の予定 + 未対応の連絡事項）
+ * 送迎管理システム - トップページ（今日以降の予定 + 未対応の連絡事項）
  * v9: 連絡事項対応、入院一覧リンク追加、ソート修正
  */
 
@@ -11,7 +11,31 @@ try {
     $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     die('DB Error');
+    die('DB Error');
 }
+
+// 設定取得
+$pdo->exec("CREATE TABLE IF NOT EXISTS app_config (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    hospital_name TEXT DEFAULT '',
+    hospital_tel TEXT DEFAULT '',
+    pharmacy_name TEXT DEFAULT '',
+    transfer_schedule_url TEXT DEFAULT ''
+)");
+$stmt = $pdo->query("SELECT * FROM app_config WHERE id = 1");
+$config = $stmt->fetch();
+if (!$config) {
+    $pdo->exec("INSERT INTO app_config (id, hospital_name, hospital_tel, pharmacy_name, transfer_schedule_url) VALUES (1, '○○透析クリニック', '00-0000-0000', '○○薬局', '')");
+    $config = [
+        'hospital_name' => '○○透析クリニック',
+        'hospital_tel' => '00-0000-0000',
+        'pharmacy_name' => '○○薬局',
+        'transfer_schedule_url' => ''
+    ];
+}
+$scheduleUrl = $config['transfer_schedule_url'] ?? '#';
+if (empty($scheduleUrl))
+    $scheduleUrl = '#'; // 未設定時は#
 
 // テーブル作成
 $pdo->exec("CREATE TABLE IF NOT EXISTS records (
@@ -96,12 +120,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // 4. 入院は今日以降のみ（過去の入院は入院一覧へ）
 $today = date('Y-m-d');
 $sql = "SELECT * FROM records WHERE 
-    (event_type = '連絡事項' AND is_handled = 0) OR
+    (event_type = '連絡事項' AND (chk_drv1 = 0 OR chk_drv2 = 0)) OR
     (event_type != '連絡事項' AND event_type != '入院' AND target_date >= '$today') OR
     (event_type = '入院' AND target_date >= '$today') OR
     (event_type = '変更' AND (orig_date >= '$today' OR target_date >= '$today'))
-    ORDER BY target_date ASC, 
-    CASE WHEN (needs_pickup = 1 OR needs_dropoff = 1) AND (pickup_time IS NULL OR pickup_time = '') THEN 0 ELSE 1 END";
+    ORDER BY 
+    CASE WHEN (chk_drv1 = 1 AND chk_drv2 = 1) THEN 1 ELSE 0 END ASC,
+    target_date ASC";
 $records = $pdo->query($sql)->fetchAll();
 ?>
 <!DOCTYPE html>
@@ -110,7 +135,7 @@ $records = $pdo->query($sql)->fetchAll();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>透析・送迎管理</title>
+    <title>送迎管理</title>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -210,7 +235,8 @@ $records = $pdo->query($sql)->fetchAll();
         td {
             padding: 10px 10px;
             text-align: left;
-            border-bottom: 1px solid var(--slate-100);
+            border-bottom: 2px solid var(--slate-300);
+            /* 太めのライン */
             font-size: 0.8rem;
         }
 
@@ -218,6 +244,7 @@ $records = $pdo->query($sql)->fetchAll();
             background: var(--slate-100);
             font-weight: 700;
             color: var(--slate-600);
+            border-bottom: 2px solid var(--slate-300);
             font-size: 0.75rem;
             white-space: nowrap;
         }
@@ -260,11 +287,14 @@ $records = $pdo->query($sql)->fetchAll();
 
         .flag {
             display: inline-block;
-            padding: 2px 5px;
-            border-radius: 4px;
-            font-size: 0.6rem;
+            padding: 4px 8px;
+            /* パディング増やす */
+            border-radius: 6px;
+            font-size: 0.9rem;
+            /* フォント大きく */
             font-weight: 700;
             margin-right: 2px;
+            line-height: 1;
         }
 
         .flag-pickup {
@@ -299,15 +329,33 @@ $records = $pdo->query($sql)->fetchAll();
         .time-display {
             font-weight: 700;
             color: var(--primary);
+            font-size: 1.3rem;
+            /* 時間を大きく */
+            letter-spacing: -0.05em;
         }
 
         .check-cell {
             text-align: center;
+            width: 1%;
+            /* 限界まで縮める (gyuu-gyuu) */
+            padding: 5px 2px !important;
+            /* 隙間を詰める */
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+
+        .check-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            justify-content: center;
         }
 
         .check-box {
-            width: 26px;
-            height: 26px;
+            width: 32px;
+            /* 少し大きく */
+            height: 32px;
             border-radius: 6px;
             border: 2px solid var(--slate-400);
             background: #fff;
@@ -315,23 +363,7 @@ $records = $pdo->query($sql)->fetchAll();
             display: inline-flex;
             align-items: center;
             justify-content: center;
-        }
-
-        .check-box.checked {
-            background: var(--success);
-            border-color: var(--success);
-        }
-
-        .check-box svg {
-            display: none;
-            width: 14px;
-            height: 14px;
-            stroke: #fff;
-            stroke-width: 3;
-        }
-
-        .check-box.checked svg {
-            display: block;
+            margin: 0 auto;
         }
 
         .action-btns {
@@ -384,12 +416,56 @@ $records = $pdo->query($sql)->fetchAll();
             color: #fff;
         }
 
-        .today-row {
+        .arrow {
+            font-weight: 700;
+            color: var(--slate-400);
+            line-height: 1.2;
+            margin: 2px 0;
+            text-align: center;
+        }
+
+        /* 文字サイズ調整（老眼対応） */
+        .name-cell {
+            font-weight: 700;
+            font-size: 1.05rem;
+            /* 名前を大きく */
+        }
+
+        .date-main {
+            font-size: 1.0rem;
+            /* 日付も見やすく */
+        }
+
+        /* 狭い列のヘッダー */
+        th.check-cell {
+            font-size: 0.7rem;
+            padding: 5px 2px;
+            vertical-align: middle;
+        }
+
+        /* 明日（黄色系で強調） */
+        .tomorrow-row {
             background: #fffbeb !important;
+            border-left: 6px solid var(--warning);
+        }
+
+        /* 当日（青系で強調） */
+        .today-row {
+            background: #e0f2fe !important;
+            border-left: 6px solid var(--primary);
         }
 
         .notice-row {
-            background: #fff7ed !important;
+            background: #fdf4ff !important;
+            /* 薄い紫 */
+            border-left: 6px solid #a855f7;
+        }
+
+        /* 未チェック（サイン不足） */
+        .unchecked-row {
+            background: #fff1f2 !important;
+            /* 薄い赤 */
+            border-left: 6px solid #f43f5e;
         }
 
         .empty {
@@ -410,9 +486,36 @@ $records = $pdo->query($sql)->fetchAll();
 
             th,
             td {
-                padding: 12px 5px;
+                padding: 12px 4px;
+                /* Padding reduced to prevent overflow */
                 font-size: 0.9rem;
                 white-space: normal;
+            }
+
+            /* Fix date cell overflow */
+            .date-cell {
+                max-width: 140px;
+                overflow: hidden;
+            }
+
+            .date-main {
+                display: block;
+                /* Ensure separate lines */
+            }
+
+            .arrow {
+                margin: 4px 0;
+                /* Add margin to prevent overlap */
+            }
+
+            /* Fix time display font size on mobile if too large */
+            .time-display {
+                font-size: 1.1rem;
+            }
+
+            /* スマホで名前等のスペースを確保 */
+            .name-cell {
+                font-size: 1.1rem;
             }
 
             .hide-mobile {
@@ -424,18 +527,146 @@ $records = $pdo->query($sql)->fetchAll();
                 padding: 4px 8px;
             }
         }
+
+        /* Header Navigation Styles */
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-header {
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-schedule {
+            background: #0ea5e9;
+            /* Light Blue */
+            color: white;
+        }
+
+        .btn-notice-list {
+            background: #d97706;
+            /* Notice Color */
+            color: white;
+        }
+
+        /* Hamburger Menu */
+        .menu-container {
+            position: relative;
+        }
+
+        .menu-btn {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--slate-600);
+        }
+
+        .menu-btn svg {
+            width: 32px;
+            height: 32px;
+            stroke-width: 2.5;
+        }
+
+        .menu-dropdown {
+            display: none;
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+            min-width: 200px;
+            overflow: hidden;
+            z-index: 100;
+            border: 1px solid var(--slate-100);
+        }
+
+        .menu-dropdown.show {
+            display: block;
+        }
+
+        .menu-item {
+            display: block;
+            padding: 12px 16px;
+            text-decoration: none;
+            color: var(--slate-800);
+            font-weight: 700;
+            border-bottom: 1px solid var(--slate-100);
+            transition: background 0.2s;
+        }
+
+        .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .menu-item:hover {
+            background: #f8fafc;
+        }
+
+        .menu-item.settings {
+            color: var(--slate-600);
+        }
     </style>
 </head>
 
 <body>
 
     <header>
-        <h1>透析・送迎管理</h1>
-        <div class="nav-links">
-            <a href="hospitalization.php" class="nav-link">入院一覧</a>
-            <a href="archive.php" class="nav-link">過去一覧 →</a>
+        <h1>送迎管理</h1>
+        <div class="nav-actions">
+            <!-- 直接表示するボタン -->
+            <a href="notice_list.php" class="btn-header btn-notice-list">連絡事項</a>
+            <a href="<?php echo h($scheduleUrl); ?>" target="_blank" class="btn-header btn-schedule">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                送迎表
+            </a>
+
+            <!-- ハンバーガーメニュー -->
+            <div class="menu-container">
+                <button class="menu-btn" onclick="document.querySelector('.menu-dropdown').classList.toggle('show')">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <line x1="3" y1="12" x2="21" y2="12" />
+                        <line x1="3" y1="6" x2="21" y2="6" />
+                        <line x1="3" y1="18" x2="21" y2="18" />
+                    </svg>
+                </button>
+                <div class="menu-dropdown">
+                    <a href="hospitalization.php" class="menu-item">入院一覧</a>
+                    <a href="archive.php" class="menu-item">過去一覧</a>
+                    <a href="settings.php" class="menu-item settings">⚙ 設定</a>
+                </div>
+            </div>
         </div>
     </header>
+
+    <!-- メニュー外クリックで閉じる処理 -->
+    <script>
+        document.addEventListener('click', function (e) {
+            const container = document.querySelector('.menu-container');
+            if (!container.contains(e.target)) {
+                document.querySelector('.menu-dropdown').classList.remove('show');
+            }
+        });
+    </script>
 
     <div class="container">
 
@@ -458,8 +689,6 @@ $records = $pdo->query($sql)->fetchAll();
                         <th>患者名</th>
                         <th>送迎</th>
                         <th>迎え時間</th>
-                        <th class="check-cell">運①</th>
-                        <th class="check-cell">運②</th>
                         <th class="hide-mobile">備考／連絡内容</th>
                         <th class="hide-mobile">担当</th>
                         <th>操作</th>
@@ -470,12 +699,29 @@ $records = $pdo->query($sql)->fetchAll();
                         $isToday = ($row['target_date'] === $today);
                         $isNotice = ($row['event_type'] === '連絡事項');
 
+                        $isTomorrow = ($row['target_date'] === date('Y-m-d', strtotime('+1 day')));
+
                         $needsPickup = $row['needs_pickup'] ?? 1;
                         $needsDropoff = $row['needs_dropoff'] ?? 1;
+                        $chkDrv1 = $row['chk_drv1'] ?? 0;
+                        $chkDrv2 = $row['chk_drv2'] ?? 0;
+                        $isUnchecked = ($chkDrv1 == 0 || $chkDrv2 == 0);
+
                         // 迎えが必要(連絡事項以外)かつ時間未入力
                         $needsDriverInput = (!$isNotice && $needsPickup && empty($row['pickup_time']));
 
-                        $rowClass = $isNotice ? 'notice-row' : ($needsDriverInput ? 'needs-driver' : ($isToday ? 'today-row' : ''));
+                        $rowClass = '';
+                        if ($isNotice) {
+                            $rowClass = 'notice-row';
+                        } elseif ($isUnchecked) {
+                            $rowClass = 'unchecked-row';
+                        } elseif ($needsDriverInput) {
+                            $rowClass = 'needs-driver';
+                        } elseif ($isToday) {
+                            $rowClass = 'today-row';
+                        } elseif ($isTomorrow) {
+                            $rowClass = 'tomorrow-row';
+                        }
 
                         $origDateStr = $row['orig_date'] ? date('n/j', strtotime($row['orig_date'])) : '';
                         $targetDateStr = $row['target_date'] ? date('n/j', strtotime($row['target_date'])) . '(' . h($row['target_weekday']) . ')' : '-';
@@ -499,26 +745,37 @@ $records = $pdo->query($sql)->fetchAll();
                         ?>
                         <tr class="<?php echo $rowClass; ?>">
                             <td class="date-cell">
-                                <div class="date-main">
-                                    <?php if ($origDateStr && $row['event_type'] === '変更'): ?>
-                                        <?php echo $origDateStr; ?>→<br><?php echo $targetDateStr; ?>
-                                    <?php else: ?>
-                                        <?php echo $targetDateStr; ?>
-                                    <?php endif; ?>
-                                </div>
-                                <?php if ($row['orig_schedule'] || $row['new_schedule']): ?>
-                                    <div class="date-sub">
-                                        <?php
-                                        if ($row['orig_schedule'] && $row['new_schedule']) {
-                                            echo h($row['orig_schedule']) . '→' . h($row['new_schedule']);
-                                        } elseif ($row['new_schedule']) {
-                                            echo h($row['new_schedule']);
-                                        } else {
-                                            echo h($row['orig_schedule']);
-                                        }
-                                        ?>
-                                    </div>
-                                <?php endif; ?>
+                                <?php
+                                $origWd = $row['orig_weekday'] ? '(' . h($row['orig_weekday']) . ')' : '';
+                                $origD = $row['orig_date'] ? date('n/j', strtotime($row['orig_date'])) : '';
+                                $origSch = h($row['orig_schedule'] ?? '');
+
+                                $targetWd = $row['target_weekday'] ? '(' . h($row['target_weekday']) . ')' : '';
+                                $targetD = $row['target_date'] ? date('n/j', strtotime($row['target_date'])) : '';
+
+                                // スケジュール決定ロジック
+                                // 変更イベントの場合、target側はnew_scheduleを使う。
+                                // 通常イベントの場合、new_scheduleがあればそれ、なければorig_scheduleを使う。
+                                $targetSchVal = $row['new_schedule'] ? $row['new_schedule'] : ($row['orig_schedule'] ?? '');
+                                $targetSch = h($targetSchVal);
+
+                                if ($row['event_type'] === '変更'):
+                                    // 変更前の表示: 日付があれば表示
+                                    if ($origD) {
+                                        echo "<div class='date-main'>{$origD}{$origWd}{$origSch}</div>";
+                                    } else {
+                                        // 日付変更なしでスケジュールのみ変更等の場合でもorigを表示すべきか？
+                                        // User request: "1/1(日)AM -> 1/2(月)PM".
+                                        // 日付がない場合(スケジュールのみ変更)は日付はtargetと同じだが...
+                                        // とりあえず元データがあれば表示
+                                        echo "<div class='date-main'>{$origSch}</div>";
+                                    }
+                                    echo "<div class='arrow'>↓</div>";
+                                    echo "<div class='date-main'>{$targetD}{$targetWd}{$targetSch}</div>";
+                                else:
+                                    echo "<div class='date-main'>{$targetD}{$targetWd}{$targetSch}</div>";
+                                endif;
+                                ?>
                             </td>
                             <td><span class="type-badge"
                                     style="background:<?php echo $badgeColor; ?>;"><?php echo h($row['event_type']); ?></span>
@@ -543,24 +800,9 @@ $records = $pdo->query($sql)->fetchAll();
                                     <span class="driver-alert" style="font-size:0.8rem;">要入力</span>
                                 <?php endif; ?>
                             </td>
-                            <td class="check-cell">
-                                <div class="check-box <?php echo $chkDrv1 ? 'checked' : ''; ?>"
-                                    onclick="toggleCheck(this, <?php echo $row['id']; ?>, 'chk_drv1', <?php echo $chkDrv1 ? 0 : 1; ?>)">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <path d="M20 6L9 17l-5-5" />
-                                    </svg>
-                                </div>
-                            </td>
-                            <td class="check-cell">
-                                <div class="check-box <?php echo $chkDrv2 ? 'checked' : ''; ?>"
-                                    onclick="toggleCheck(this, <?php echo $row['id']; ?>, 'chk_drv2', <?php echo $chkDrv2 ? 0 : 1; ?>)">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                        <path d="M20 6L9 17l-5-5" />
-                                    </svg>
-                                </div>
-                            </td>
                             <td class="hide-mobile" style="font-size:0.75rem; color:var(--slate-600); max-width:100px;">
-                                <?php echo h($row['reason'] ?? ''); ?></td>
+                                <?php echo h($row['reason'] ?? ''); ?>
+                            </td>
                             <td class="hide-mobile staff-info">
                                 <?php if ($createdBy): ?>入力:<?php echo h($createdBy); ?><br><?php endif; ?>
                                 <?php if ($technician): ?>技士:<?php echo h($technician); ?><br><?php endif; ?>
@@ -569,12 +811,8 @@ $records = $pdo->query($sql)->fetchAll();
                             <td>
                                 <div class="action-btns">
                                     <?php if ($isNotice): ?>
-                                        <form method="post" style="display:inline;"
-                                            onsubmit="return confirm('対応済みにしますか？（一覧から消えます）');">
-                                            <input type="hidden" name="action" value="handle">
-                                            <input type="hidden" name="id" value="<?php echo $row['id']; ?>">
-                                            <button type="submit" class="btn btn-handle">対応済</button>
-                                        </form>
+                                        <!-- 自動移動のためボタンなし -->
+                                        <span style="font-size:0.75rem; color:var(--slate-400);">サイン後移動</span>
                                     <?php else: ?>
                                         <a href="edit.php?id=<?php echo $row['id']; ?>" class="btn btn-edit">編集</a>
                                         <?php if (in_array($row['event_type'], ['入院', '退院', '永眠']) || ($row['pharmacy_req'] ?? '') === '必要'): ?>
