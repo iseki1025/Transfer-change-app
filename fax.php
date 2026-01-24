@@ -12,6 +12,11 @@ try {
     die('DB Error');
 }
 
+function h($str)
+{
+    return htmlspecialchars($str ?? '', ENT_QUOTES, 'UTF-8');
+}
+
 $id = $_GET['id'] ?? 0;
 $stmt = $pdo->prepare("SELECT * FROM records WHERE id = ?");
 $stmt->execute([$id]);
@@ -163,28 +168,29 @@ $eventType = $row['event_type'];
             position: fixed;
             bottom: 30px;
             right: 30px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: #3b82f6;
+            background: #1e293b;
             color: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: 700;
             border: none;
-            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
             cursor: pointer;
             display: flex;
             align-items: center;
-            justify-content: center;
+            gap: 10px;
             transition: transform 0.2s;
         }
 
         .fab:hover {
-            transform: scale(1.1);
-            background: #2563eb;
+            transform: scale(1.05);
+            background: #334155;
         }
 
         .fab svg {
-            width: 28px;
-            height: 28px;
+            width: 24px;
+            height: 24px;
             stroke: currentColor;
             fill: none;
             stroke-width: 2;
@@ -225,7 +231,8 @@ $eventType = $row['event_type'];
             <div style="width: 30%; text-align: right;">
                 <div class="label">送信日</div>
                 <div class="value" style="font-size: 12pt; border: none; text-align: right;">
-                    <?php echo date('Y年n月j日'); ?></div>
+                    <?php echo date('Y年n月j日'); ?>
+                </div>
             </div>
         </div>
 
@@ -246,7 +253,7 @@ $eventType = $row['event_type'];
                     class="highlight">終了</span> してください。
             <?php elseif ($row['pharmacy_date']): ?>
                 透析日の変更に伴い、<br><span class="highlight"><?php echo date('n月j日', strtotime($row['pharmacy_date'])); ?></span>
-                より配薬日を変更してください。
+                に配薬日を変更してください。
             <?php else: ?>
                 配薬に関する連絡事項がございます。
             <?php endif; ?>
@@ -262,7 +269,8 @@ $eventType = $row['event_type'];
         <div class="footer">
             <strong><?php echo h($hospitalName); ?></strong><br>
             TEL: <?php echo h($hospitalTel); ?><br>
-            担当: スタッフ一同
+            担当:
+            <?php echo h($row['created_by'] ?: 'スタッフ一同'); ?>
         </div>
     </div>
 
@@ -272,6 +280,7 @@ $eventType = $row['event_type'];
             <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
             <path d="M6 14h12v8H6z" />
         </svg>
+        印刷する
     </button>
 
 </body>

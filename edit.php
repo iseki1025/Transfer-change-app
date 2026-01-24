@@ -26,7 +26,14 @@ $columns = [
     "office_staff TEXT",
     "bxp_change TEXT DEFAULT 'なし'",
     "exam_change TEXT DEFAULT 'なし'",
-    "is_handled INTEGER DEFAULT 0"
+    "is_handled INTEGER DEFAULT 0",
+    "transport_method TEXT DEFAULT '送迎'",
+    "self_transport_type TEXT",
+    "parking_number TEXT",
+    "self_needs_dropoff INTEGER DEFAULT 1",
+    "taxi_needs_dropoff INTEGER DEFAULT 0",
+    "event_needs_dropoff INTEGER DEFAULT 0",
+    "exam_date TEXT"
 ];
 foreach ($columns as $col) {
     try {
@@ -75,7 +82,14 @@ $row = [
     'pharmacy_date' => '',
     'created_by' => '',
     'technician' => '',
-    'office_staff' => ''
+    'office_staff' => '',
+    'transport_method' => '送迎',
+    'self_transport_type' => '',
+    'parking_number' => '',
+    'self_needs_dropoff' => 1,
+    'taxi_needs_dropoff' => 0,
+    'event_needs_dropoff' => 0,
+    'exam_date' => ''
 ];
 
 if (!$isNew) {
@@ -94,8 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isNew) {
         $stmt = $pdo->prepare("INSERT INTO records 
-            (p_name, event_type, orig_date, orig_weekday, orig_schedule, target_date, target_weekday, new_schedule, reason, needs_pickup, needs_dropoff, pickup_time, bed_change, bed_no, bxp_change, exam_change, pharmacy_req, pharmacy_date, created_by, technician, office_staff, chk_drv1, chk_drv2) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (p_name, event_type, orig_date, orig_weekday, orig_schedule, target_date, target_weekday, new_schedule, reason, needs_pickup, needs_dropoff, pickup_time, bed_change, bed_no, bxp_change, exam_change, pharmacy_req, pharmacy_date, created_by, technician, office_staff, chk_drv1, chk_drv2, transport_method, self_transport_type, parking_number, self_needs_dropoff, taxi_needs_dropoff, event_needs_dropoff, exam_date) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['p_name'],
             $_POST['event_type'],
@@ -119,7 +133,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['technician'] ?? '',
             $_POST['office_staff'] ?? '',
             isset($_POST['chk_drv1']) ? 1 : 0,
-            isset($_POST['chk_drv2']) ? 1 : 0
+            isset($_POST['chk_drv2']) ? 1 : 0,
+            $_POST['transport_method'] ?? '送迎',
+            $_POST['self_transport_type'] ?? '',
+            $_POST['parking_number'] ?? '',
+            isset($_POST['self_needs_dropoff']) ? 1 : 0,
+            isset($_POST['taxi_needs_dropoff']) ? 1 : 0,
+            isset($_POST['event_needs_dropoff']) ? 1 : 0,
+            $_POST['exam_date'] ?? ''
         ]);
     } else {
         $stmt = $pdo->prepare("UPDATE records SET 
@@ -129,7 +150,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             bed_change=?, bed_no=?, bxp_change=?, exam_change=?,
             pharmacy_req=?, pharmacy_date=?,
             created_by=?, technician=?, office_staff=?,
-            chk_drv1=?, chk_drv2=?
+            chk_drv1=?, chk_drv2=?,
+            transport_method=?, self_transport_type=?, parking_number=?, self_needs_dropoff=?,
+            taxi_needs_dropoff=?, event_needs_dropoff=?, exam_date=?
             WHERE id=?");
         $stmt->execute([
             $_POST['p_name'],
@@ -155,6 +178,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST['office_staff'] ?? '',
             isset($_POST['chk_drv1']) ? 1 : 0,
             isset($_POST['chk_drv2']) ? 1 : 0,
+            $_POST['transport_method'] ?? '送迎',
+            $_POST['self_transport_type'] ?? '',
+            $_POST['parking_number'] ?? '',
+            isset($_POST['self_needs_dropoff']) ? 1 : 0,
+            isset($_POST['taxi_needs_dropoff']) ? 1 : 0,
+            isset($_POST['event_needs_dropoff']) ? 1 : 0,
+            $_POST['exam_date'] ?? '',
             $_POST['id']
         ]);
     }
@@ -332,6 +362,46 @@ $pickupTime = $row['pickup_time'] ?? '';
             color: var(--primary);
         }
 
+        /* 種別ごとの色分け */
+        .type-btn.active[data-type="変更"] {
+            border-color: #3b82f6;
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+        .type-btn.active[data-type="臨時"] {
+            border-color: #f97316;
+            background: #ffedd5;
+            color: #c2410c;
+        }
+        .type-btn.active[data-type="入院"] {
+            border-color: #ef4444;
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .type-btn.active[data-type="退院"] {
+            border-color: #22c55e;
+            background: #dcfce7;
+            color: #15803d;
+        }
+        .type-btn.active[data-type="連絡事項"] {
+            border-color: #d97706;
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .type-btn.active[data-type="永眠"] {
+            border-color: #6b7280;
+            background: #f3f4f6;
+            color: #374151;
+        }
+
+        /* カード背景の種別色（全体に色が分かるグラデーション） */
+        .card.type-変更 { background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 50%, #fff 100%); }
+        .card.type-臨時 { background: linear-gradient(135deg, #fed7aa 0%, #fff7ed 50%, #fff 100%); }
+        .card.type-入院 { background: linear-gradient(135deg, #fecaca 0%, #fef2f2 50%, #fff 100%); }
+        .card.type-退院 { background: linear-gradient(135deg, #bbf7d0 0%, #f0fdf4 50%, #fff 100%); }
+        .card.type-連絡事項 { background: linear-gradient(135deg, #fde68a 0%, #fffbeb 50%, #fff 100%); }
+        .card.type-永眠 { background: linear-gradient(135deg, #e5e7eb 0%, #f9fafb 50%, #fff 100%); }
+
         .date-row {
             display: grid;
             grid-template-columns: 1fr 30px 1fr;
@@ -435,7 +505,7 @@ $pickupTime = $row['pickup_time'] ?? '';
             color: #92400e;
         }
 
-        .pickup-time-box input[type="time"] {
+        .pickup-time-box input[type="tel"] {
             font-size: 1.2rem;
             font-weight: 700;
         }
@@ -500,7 +570,7 @@ $pickupTime = $row['pickup_time'] ?? '';
                 gap: 4px;
             }
 
-            .pickup-time-box input[type="time"] {
+            .pickup-time-box input[type="tel"] {
                 width: auto !important;
                 max-width: 100%;
                 display: inline-block;
@@ -640,9 +710,97 @@ $pickupTime = $row['pickup_time'] ?? '';
                     value="<?php echo h($row['target_date']); ?>">
             </div>
 
-            <!-- 送り迎えフラグ -->
+            <!-- 来院方法 -->
+            <div id="transport_method_section"
+                class="<?php echo in_array($row['event_type'], ['変更', '臨時', '退院', '']) ? '' : 'hidden'; ?>">
+                <label>来院方法</label>
+                <div class="ampm-btns" style="margin-bottom: 10px;">
+                    <?php $tm = $row['transport_method'] ?? '送迎'; ?>
+                    <div class="ampm-btn <?php echo $tm === '送迎' ? 'active' : ''; ?>"
+                        onclick="setTransportMethod(this, '送迎')">送迎</div>
+                    <div class="ampm-btn <?php echo $tm === '自走' ? 'active' : ''; ?>"
+                        onclick="setTransportMethod(this, '自走')">自走</div>
+                    <div class="ampm-btn <?php echo $tm === 'タクシー' ? 'active' : ''; ?>"
+                        onclick="setTransportMethod(this, 'タクシー')">タクシー</div>
+                </div>
+                <input type="hidden" name="transport_method" id="transport_method"
+                    value="<?php echo h($row['transport_method'] ?? '送迎'); ?>">
+
+                <!-- 自走時の詳細選択 -->
+                <div id="self_transport_section" class="<?php echo $tm === '自走' ? '' : 'hidden'; ?>" style="margin-top: 10px;">
+                    <label>自走の詳細</label>
+                    <div class="ampm-btns">
+                        <?php $stt = $row['self_transport_type'] ?? ''; ?>
+                        <div class="ampm-btn <?php echo $stt === '自動車' ? 'active' : ''; ?>"
+                            onclick="setSelfTransportType(this, '自動車')">自動車</div>
+                        <div class="ampm-btn <?php echo $stt === '徒歩' ? 'active' : ''; ?>"
+                            onclick="setSelfTransportType(this, '徒歩')">徒歩</div>
+                        <div class="ampm-btn <?php echo $stt === '自転車' ? 'active' : ''; ?>"
+                            onclick="setSelfTransportType(this, '自転車')">自転車</div>
+                        <div class="ampm-btn <?php echo $stt === '家族送迎' ? 'active' : ''; ?>"
+                            onclick="setSelfTransportType(this, '家族送迎')">家族送迎</div>
+                    </div>
+                    <input type="hidden" name="self_transport_type" id="self_transport_type"
+                        value="<?php echo h($row['self_transport_type'] ?? ''); ?>">
+
+                    <!-- 駐車場番号（自動車/家族送迎時のみ） -->
+                    <div id="parking_section" class="<?php echo in_array($stt, ['自動車', '家族送迎']) ? '' : 'hidden'; ?>" style="margin-top: 10px;">
+                        <label>🅿️ 駐車場番号</label>
+                        <input type="text" name="parking_number" id="parking_number" 
+                            value="<?php echo h($row['parking_number'] ?? ''); ?>" placeholder="例: A-12">
+                    </div>
+
+                    <!-- 送りチェック（徒歩/家族送迎時のみ - 自動車は除外） -->
+                    <?php $selfNeedsDropoff = $row['self_needs_dropoff'] ?? 1; ?>
+                    <div id="self_dropoff_section" class="<?php echo in_array($stt, ['徒歩', '家族送迎']) ? '' : 'hidden'; ?>" style="margin-top: 10px;">
+                        <div class="checkbox-row">
+                            <label class="checkbox-item <?php echo $selfNeedsDropoff ? 'checked' : ''; ?>">
+                                <input type="checkbox" name="self_needs_dropoff" <?php echo $selfNeedsDropoff ? 'checked' : ''; ?>
+                                    onchange="this.parentNode.classList.toggle('checked', this.checked)">
+                                送りあり
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- タクシー送りあり（タクシー選択時のみ・普通のチェック） -->
+                <?php $taxiNeedsDropoff = $row['taxi_needs_dropoff'] ?? 0; ?>
+                <div id="taxi_dropoff_section" class="<?php echo $tm === 'タクシー' ? '' : 'hidden'; ?>" style="margin-top: 10px;">
+                    <div class="checkbox-row">
+                        <label class="checkbox-item <?php echo $taxiNeedsDropoff ? 'checked' : ''; ?>">
+                            <input type="checkbox" name="taxi_needs_dropoff" <?php echo $taxiNeedsDropoff ? 'checked' : ''; ?>
+                                onchange="this.parentNode.classList.toggle('checked', this.checked)">
+                            送りあり
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 入院時の送り選択（送りあり or 送りあり（タクシー）） -->
+            <?php 
+            $eventNeedsDropoff = $row['event_needs_dropoff'] ?? 0;
+            $taxiEventDropoff = $row['taxi_needs_dropoff'] ?? 0;
+            ?>
+            <div id="hospital_dropoff_section" class="<?php echo $row['event_type'] === '入院' ? '' : 'hidden'; ?>" style="margin-top: 10px;">
+                <label>送り方法</label>
+                <div class="checkbox-row">
+                    <label class="checkbox-item <?php echo $eventNeedsDropoff ? 'checked' : ''; ?>">
+                        <input type="checkbox" name="event_needs_dropoff" id="event_needs_dropoff_cb" <?php echo $eventNeedsDropoff ? 'checked' : ''; ?>
+                            onchange="this.parentNode.classList.toggle('checked', this.checked)">
+                        送りあり
+                    </label>
+                    <label class="checkbox-item <?php echo $taxiEventDropoff ? 'checked' : ''; ?>">
+                        <input type="checkbox" name="taxi_needs_dropoff" id="taxi_event_dropoff_cb" <?php echo $taxiEventDropoff ? 'checked' : ''; ?>
+                            onchange="this.parentNode.classList.toggle('checked', this.checked)">
+                        送りあり（タクシー）
+                    </label>
+                </div>
+            </div>
+
+            <!-- 送り迎えフラグ（送迎選択時のみ） -->
+            <?php $showTransportFlags = in_array($row['event_type'], ['変更', '臨時', '']) && ($tm === '送迎'); ?>
             <div id="transport_flags"
-                class="<?php echo in_array($row['event_type'], ['変更', '臨時', '']) ? '' : 'hidden'; ?>">
+                class="<?php echo $showTransportFlags ? '' : 'hidden'; ?>">
                 <label>送迎の変更</label>
                 <div class="checkbox-row">
                     <label class="checkbox-item <?php echo $needsPickup ? 'checked' : ''; ?>">
@@ -656,15 +814,83 @@ $pickupTime = $row['pickup_time'] ?? '';
                     </label>
                 </div>
 
-                <div id="pickup_time_section" class="pickup-time-box <?php echo $needsPickup ? '' : 'hidden'; ?>">
+            <div class="pickup-time-box">
                     <label>🚗 迎え時間</label>
-                    <input type="time" name="pickup_time" id="pickup_time" value="<?php echo h($pickupTime); ?>">
-                    <div class="pickup-time-hint">※ 入力すると一覧に「案内」ボタンが表示されます</div>
-                </div>
+                    <input type="hidden" name="pickup_time" id="pickup_time" value="<?php echo h($pickupTime); ?>">
+                    <div class="time-input-group">
+                        <input type="tel" id="pickup_hour" class="time-part" maxlength="2" inputmode="numeric">
+                        <span class="time-sep">:</span>
+                        <input type="tel" id="pickup_minute" class="time-part" maxlength="2" inputmode="numeric">
+                    </div>
+                    <div class="pickup-time-hint">※ 数字のみ入力</div>
+            </div>
+                    
+                    <style>
+                        .time-input-group {
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 5px;
+                        }
+                        .time-part {
+                            width: 60px !important;
+                            text-align: center;
+                            font-size: 1.4rem !important;
+                            padding: 10px 5px !important;
+                            border-radius: 8px;
+                            border: 1px solid #94a3b8;
+                        }
+                        .time-sep {
+                            font-weight: 700;
+                            font-size: 1.4rem;
+                            color: #92400e;
+                        }
+                    </style>
+                    <script>
+                        (function() {
+                            var pt = document.getElementById('pickup_time');
+                            var ph = document.getElementById('pickup_hour');
+                            var pm = document.getElementById('pickup_minute');
+
+                            // 初期値セット
+                            if (pt.value && pt.value.includes(':')) {
+                                var parts = pt.value.split(':');
+                                ph.value = parts[0];
+                                pm.value = parts[1];
+                            }
+
+                            function updateHidden() {
+                                var h = ph.value.padStart(2, '0');
+                                var m = pm.value.padStart(2, '0');
+                                if (ph.value === '' && pm.value === '') {
+                                    pt.value = '';
+                                } else {
+                                    pt.value = h + ':' + m;
+                                }
+                            }
+
+                            ph.addEventListener('input', function() {
+                                if (this.value.length >= 2) pm.focus();
+                                updateHidden();
+                            });
+                            pm.addEventListener('input', updateHidden);
+                            
+                            // フォーカスが外れた時に0埋めする
+                            ph.addEventListener('blur', function() {
+                                if(this.value.length === 1) this.value = this.value.padStart(2, '0');
+                                updateHidden();
+                            });
+                            pm.addEventListener('blur', function() {
+                                if(this.value.length === 1) this.value = this.value.padStart(2, '0');
+                                updateHidden();
+                            });
+                        })();
+                    </script>
             </div>
 
             <label>理由・備考</label>
-            <textarea name="reason" placeholder="任意"><?php echo h($row['reason']); ?></textarea>
+            <textarea name="reason" id="reason_textarea" placeholder="任意"><?php echo h($row['reason']); ?></textarea>
+
 
             <div class="section-title">その他オプション</div>
 
@@ -700,8 +926,8 @@ $pickupTime = $row['pickup_time'] ?? '';
                     </select>
                 </div>
                 <div>
-                    <label>検査変更</label>
-                    <select name="exam_change">
+                    <label>採血検査</label>
+                    <select name="exam_change" id="exam_change" onchange="toggleExtra()">
                         <option value="なし" <?php if (($row['exam_change'] ?? '') === 'なし')
                             echo 'selected'; ?>>なし</option>
                         <option value="あり" <?php if (($row['exam_change'] ?? '') === 'あり')
@@ -712,8 +938,14 @@ $pickupTime = $row['pickup_time'] ?? '';
 
             <div id="extra_pharmacy" class="<?php echo ($row['pharmacy_req'] ?? '') === '必要' ? '' : 'hidden'; ?>">
                 <label>配薬変更日</label>
-                <input type="date" name="pharmacy_date" value="<?php echo h($row['pharmacy_date']); ?>">
+                <input type="date" name="pharmacy_date" id="pharmacy_date" value="<?php echo h($row['pharmacy_date']); ?>">
             </div>
+            
+            <div id="extra_exam" class="<?php echo ($row['exam_change'] ?? '') === 'あり' ? '' : 'hidden'; ?>">
+                <label>採血検査日</label>
+                <input type="date" name="exam_date" id="exam_date" value="<?php echo h($row['exam_date']); ?>">
+            </div>
+
             <div id="extra_bed" class="<?php echo ($row['bed_change'] ?? '') === 'あり' ? '' : 'hidden'; ?>">
                 <label>新ベッドNo</label>
                 <input type="text" name="bed_no" value="<?php echo h($row['bed_no']); ?>">
@@ -739,11 +971,23 @@ $pickupTime = $row['pickup_time'] ?? '';
             var isChange = (t === '変更');
             var isTemp = (t === '臨時');
             var isEditor = (isChange || isTemp);
+            var isHospital = (t === '入院');
+            var isDischarge = (t === '退院');
 
             document.getElementById('date_change').className = isEditor ? '' : 'hidden';
             document.getElementById('date_single').className = isEditor ? 'hidden' : '';
             document.getElementById('btn_tomorrow').className = isTemp ? '' : 'hidden';
-            document.getElementById('transport_flags').className = isEditor ? '' : 'hidden';
+            
+            // 来院方法セクションの表示制御（変更/臨時/退院で表示）
+            var showTransportMethod = (isEditor || isDischarge);
+            document.getElementById('transport_method_section').className = showTransportMethod ? '' : 'hidden';
+            
+            // 送迎フラグは来院方法が送迎の場合のみ表示
+            var tm = document.getElementById('transport_method').value;
+            document.getElementById('transport_flags').className = (isEditor && tm === '送迎') ? '' : 'hidden';
+
+            // 入院時の送り選択セクション表示
+            document.getElementById('hospital_dropoff_section').className = isHospital ? '' : 'hidden';
 
             if (t === '入院') document.getElementById('single_label').textContent = '入院日';
             else if (t === '退院') document.getElementById('single_label').textContent = '退院日';
@@ -760,6 +1004,32 @@ $pickupTime = $row['pickup_time'] ?? '';
             document.getElementById('orig_time_wrapper').style.display = origDisp;
             document.getElementById('time_arrow').style.display = origDisp;
             document.getElementById('date_row_time').style.gridTemplateColumns = gridStyle;
+
+            // 臨時透析の場合のみ、理由欄に初期値を設定（空の場合のみ）
+            var reasonTextarea = document.getElementById('reason_textarea');
+            if (reasonTextarea) {
+                if (isTemp && reasonTextarea.value === '') {
+                    reasonTextarea.value = '今週は透析４回です。';
+                }
+                // 臨時以外に変更した場合、初期値が入っていたらクリア
+                if (!isTemp && reasonTextarea.value === '今週は透析４回です。') {
+                    reasonTextarea.value = '';
+                }
+            }
+
+            // カード背景色を種別に応じて変更
+            updateCardBackground(t);
+        }
+
+        function updateCardBackground(type) {
+            var card = document.querySelector('.card');
+            if (!card) return;
+            // 既存のtype-クラスをすべて削除
+            card.className = card.className.replace(/type-\S+/g, '').trim();
+            // 新しいクラスを追加
+            if (type) {
+                card.classList.add('type-' + type);
+            }
         }
 
         function setAmPm(el, prefix) {
@@ -776,7 +1046,33 @@ $pickupTime = $row['pickup_time'] ?? '';
         }
 
         function toggleExtra() {
-            document.getElementById('extra_pharmacy').className = (document.getElementById('pharmacy_req').value === '必要') ? '' : 'hidden';
+            // 配薬連絡
+            var pharmacyReq = document.getElementById('pharmacy_req').value;
+            var pharmacyDateInput = document.getElementById('pharmacy_date');
+            document.getElementById('extra_pharmacy').className = (pharmacyReq === '必要') ? '' : 'hidden';
+            
+            // 配薬連絡がありの場合、新しい日付をデフォルトで表示（空の場合のみ）
+            if (pharmacyReq === '必要' && pharmacyDateInput.value === '') {
+                var targetDate = document.getElementById('target_date').value;
+                if (targetDate) {
+                    pharmacyDateInput.value = targetDate;
+                }
+            }
+
+            // 採血検査
+            var examChange = document.getElementById('exam_change').value;
+            var examDateInput = document.getElementById('exam_date');
+            document.getElementById('extra_exam').className = (examChange === 'あり') ? '' : 'hidden';
+
+            // 採血検査がありの場合、新しい日付をデフォルトで表示（空の場合のみ）
+            if (examChange === 'あり' && examDateInput.value === '') {
+                var targetDate = document.getElementById('target_date').value;
+                if (targetDate) {
+                    examDateInput.value = targetDate;
+                }
+            }
+
+            // ベッド変更
             document.getElementById('extra_bed').className = (document.getElementById('bed_change').value === 'あり') ? '' : 'hidden';
         }
 
@@ -785,10 +1081,60 @@ $pickupTime = $row['pickup_time'] ?? '';
             document.getElementById('pickup_time_section').className = cb.checked ? 'pickup-time-box' : 'pickup-time-box hidden';
         }
 
+        // 来院方法の切り替え
+        function setTransportMethod(el, method) {
+            var btns = el.parentNode.querySelectorAll('.ampm-btn');
+            for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+            el.classList.add('active');
+            document.getElementById('transport_method').value = method;
+
+            // 自走セクションの表示切替
+            document.getElementById('self_transport_section').className = (method === '自走') ? '' : 'hidden';
+            
+            // 送迎フラグの表示切替（送迎の場合のみ表示）
+            document.getElementById('transport_flags').className = (method === '送迎') ? '' : 'hidden';
+
+            // タクシー送りセクションの表示切替
+            document.getElementById('taxi_dropoff_section').className = (method === 'タクシー') ? '' : 'hidden';
+            
+            // 自走以外を選んだ場合、自走関連フィールドをリセット
+            if (method !== '自走') {
+                document.getElementById('self_transport_type').value = '';
+                document.getElementById('parking_section').className = 'hidden';
+                document.getElementById('self_dropoff_section').className = 'hidden';
+                // 自走詳細ボタンのactiveをクリア
+                var sttBtns = document.getElementById('self_transport_section').querySelectorAll('.ampm-btn');
+                for (var i = 0; i < sttBtns.length; i++) sttBtns[i].classList.remove('active');
+            }
+        }
+
+        // 自走詳細の切り替え
+        function setSelfTransportType(el, type) {
+            var btns = el.parentNode.querySelectorAll('.ampm-btn');
+            for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+            el.classList.add('active');
+            document.getElementById('self_transport_type').value = type;
+
+            // 駐車場番号：自動車/家族送迎の場合のみ表示
+            var showParking = (type === '自動車' || type === '家族送迎');
+            document.getElementById('parking_section').className = showParking ? '' : 'hidden';
+
+            // 送りチェック：徒歩/家族送迎の場合のみ表示（自動車と自転車は不要）
+            var showDropoff = (type === '徒歩' || type === '家族送迎');
+            document.getElementById('self_dropoff_section').className = showDropoff ? '' : 'hidden';
+        }
+
         window.onload = function () {
             var activeBtn = document.querySelector('.type-btn.active');
-            if (activeBtn) setType(activeBtn);
+            if (activeBtn) {
+                setType(activeBtn);
+            }
             togglePickupTime();
+            // 初期カード背景色を設定
+            var eventType = document.getElementById('event_type').value;
+            if (eventType) {
+                updateCardBackground(eventType);
+            }
         };
     </script>
 

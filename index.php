@@ -100,6 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete') {
         $pdo->prepare("DELETE FROM records WHERE id=?")->execute([$_POST['id']]);
+        header('Location: index.php');
+        exit;
     } elseif ($action === 'check') {
         $field = $_POST['field'];
         $value = $_POST['value'];
@@ -107,25 +109,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (in_array($field, ['chk_drv1', 'chk_drv2'])) {
             $pdo->prepare("UPDATE records SET $field = ? WHERE id = ?")->execute([$value, $id]);
         }
+        header('Location: index.php');
+        exit;
     } elseif ($action === 'handle') {
         // 連絡事項の対応済み処理
         $pdo->prepare("UPDATE records SET is_handled = 1 WHERE id = ?")->execute([$_POST['id']]);
+        header('Location: index.php');
+        exit;
     }
 }
 
 // データ取得
 // 1. 今日以降の予定（入院除く）
 // 2. 変更の場合は元の日付or先の日付が今日以降なら表示
-// 3. 連絡事項は未対応なら日付問わず（あるいは今日以降）表示 -> UI的には「未対応ならずっと」が要望なので日付条件外す
-// 4. 入院は今日以降のみ（過去の入院は入院一覧へ）
+// 3. 連絡事項は未対応なら日付問わず表示
+// 4. 入院は今日以降のみ
 $today = date('Y-m-d');
-$sql = "SELECT * FROM records WHERE 
+$sevenDaysLater = date('Y-m-d', strtotime('+7 days'));
+$fourteenDaysLater = date('Y-m-d', strtotime('+14 days'));
+
+$sql = "SELECT *,
+    CASE
+        -- 優先度1: 技士未確認 (7日以内かつ技士名が空) -> スコア 10
+        WHEN (target_date <= '$sevenDaysLater' AND (technician IS NULL OR technician = '')) THEN 10
+        
+        -- 優先度2: 医事・運転手未確認 (14日以内かつ (医事名が空 OR 運転手チェック未完)) -> スコア 20
+        WHEN (target_date <= '$fourteenDaysLater' AND ((office_staff IS NULL OR office_staff = '') OR (chk_drv1 = 0 OR chk_drv2 = 0))) THEN 20
+        
+        -- 優先度3: その他 -> スコア 30
+        ELSE 30
+    END as priority_score
+    FROM records WHERE 
     (event_type = '連絡事項' AND (chk_drv1 = 0 OR chk_drv2 = 0)) OR
     (event_type != '連絡事項' AND event_type != '入院' AND target_date >= '$today') OR
     (event_type = '入院' AND target_date >= '$today') OR
     (event_type = '変更' AND (orig_date >= '$today' OR target_date >= '$today'))
     ORDER BY 
-    CASE WHEN (chk_drv1 = 1 AND chk_drv2 = 1) THEN 1 ELSE 0 END ASC,
+    priority_score ASC,
     target_date ASC";
 $records = $pdo->query($sql)->fetchAll();
 ?>
@@ -461,11 +481,28 @@ $records = $pdo->query($sql)->fetchAll();
             border-left: 6px solid #a855f7;
         }
 
-        /* 未チェック（サイン不足） */
-        .unchecked-row {
-            background: #fff1f2 !important;
-            /* 薄い赤 */
-            border-left: 6px solid #f43f5e;
+        /* アラート：技士未確認（赤） */
+        .alert-technician {
+            background: #fef2f2 !important;
+            border-left: 6px solid #ef4444;
+        }
+
+        /* アラート：医事・運転手未確認（オレンジ） */
+        .alert-staff {
+            background: #fff7ed !important;
+            border-left: 6px solid #f97316;
+        }
+
+        /* 未来の日付（目立たなくする） */
+        .future-gray {
+            background: #e2e8f0 !important;
+            border-left: 6px solid #64748b;
+            color: #64748b;
+        }
+
+        .future-gray .date-cell,
+        .future-gray .name-cell {
+            color: #64748b;
         }
 
         .empty {
@@ -707,20 +744,30 @@ $records = $pdo->query($sql)->fetchAll();
                         $chkDrv2 = $row['chk_drv2'] ?? 0;
                         $isUnchecked = ($chkDrv1 == 0 || $chkDrv2 == 0);
 
-                        // 迎えが必要(連絡事項以外)かつ時間未入力
                         $needsDriverInput = (!$isNotice && $needsPickup && empty($row['pickup_time']));
 
+                        $sevenDaysLaterTime = strtotime('+7 days');
+                        $targetDateTime = strtotime($row['target_date']);
+
                         $rowClass = '';
-                        if ($isNotice) {
+                        $priorityScore = $row['priority_score'] ?? 30; // デフォルト30
+                
+                        if ($priorityScore == 10) {
+                            $rowClass = 'alert-technician'; // 技士未確認（赤）
+                        } elseif ($priorityScore == 20) {
+                            $rowClass = 'alert-staff'; // 医事・運転手未確認（オレンジ）
+                        } elseif ($isNotice) {
                             $rowClass = 'notice-row';
-                        } elseif ($isUnchecked) {
-                            $rowClass = 'unchecked-row';
-                        } elseif ($needsDriverInput) {
-                            $rowClass = 'needs-driver';
                         } elseif ($isToday) {
                             $rowClass = 'today-row';
                         } elseif ($isTomorrow) {
                             $rowClass = 'tomorrow-row';
+                        } elseif ($targetDateTime >= $sevenDaysLaterTime) {
+                            $rowClass = 'future-gray'; // 7日以上先（グレー）
+                        } elseif ($isUnchecked) {
+                            $rowClass = 'unchecked-row'; // 既存の未チェック（サイン不足 - 残しておく場合）
+                        } elseif ($needsDriverInput) {
+                            $rowClass = 'needs-driver';
                         }
 
                         $origDateStr = $row['orig_date'] ? date('n/j', strtotime($row['orig_date'])) : '';
@@ -819,9 +866,17 @@ $records = $pdo->query($sql)->fetchAll();
                                             <a href="fax.php?id=<?php echo $row['id']; ?>" target="_blank"
                                                 class="btn <?php echo ($row['fax_sent'] ?? 0) ? 'btn-fax-done' : 'btn-fax'; ?>">FAX</a>
                                         <?php endif; ?>
-                                        <?php if ($pickupTime): ?>
+                                        <?php
+                                        $tm = $row['transport_method'] ?? '送迎';
+                                        $stt = $row['self_transport_type'] ?? '';
+                                        $parkingNo = $row['parking_number'] ?? '';
+
+                                        if ($tm === '送迎' && $pickupTime): ?>
                                             <a href="notice.php?id=<?php echo $row['id']; ?>" target="_blank"
                                                 class="btn btn-notice">案内</a>
+                                        <?php elseif ($tm === '自走' && in_array($stt, ['自動車', '家族送迎']) && $parkingNo): ?>
+                                            <a href="parking_notice.php?id=<?php echo $row['id']; ?>" target="_blank"
+                                                class="btn btn-notice" style="background:#f59e0b;">駐車場案内</a>
                                         <?php endif; ?>
                                         <form method="post" style="display:inline;" onsubmit="return confirm('削除しますか？');">
                                             <input type="hidden" name="action" value="delete">
