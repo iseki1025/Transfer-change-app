@@ -103,6 +103,13 @@ if (!$isNew) {
 
 // POST処理
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // 削除処理（論理削除）
+    if (($_POST['action'] ?? '') === 'delete') {
+        $pdo->prepare("UPDATE records SET is_deleted = 1 WHERE id = ?")->execute([$_POST['id']]);
+        header('Location: trash.php');
+        exit;
+    }
+
     $origWd = getWeekday($_POST['orig_date'] ?? '');
     $targetWd = getWeekday($_POST['target_date'] ?? '');
 
@@ -589,7 +596,18 @@ $pickupTime = $row['pickup_time'] ?? '';
     <header>
         <a href="index.php" class="back-link">← 戻る</a>
         <h1><?php echo $pageTitle; ?></h1>
-        <div style="width:50px;"></div>
+        <div style="width:50px; text-align:right;">
+            <?php if (!$isNew): ?>
+                <form method="post" onsubmit="return confirm('削除してゴミ箱に移動しますか？');" style="margin:0;">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="id" value="<?php echo $row['id']; ?>">
+                    <button type="submit" style="background:none; border:none; color:#dc2626; cursor:pointer; padding:4px;">
+                        <!-- ゴミ箱アイコン -->
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
     </header>
 
     <div class="container">
@@ -620,15 +638,18 @@ $pickupTime = $row['pickup_time'] ?? '';
                 
                 <div style="margin-top: 15px; border-top: 1px dashed #cbd5e1; padding-top: 10px;">
                     <label style="color:#1e40af;">運転手確認</label>
-                    <div class="checkbox-row">
-                        <label class="checkbox-item <?php echo ($row['chk_drv1'] ?? 0) ? 'checked' : ''; ?>">
-                            <input type="checkbox" name="chk_drv1" <?php echo ($row['chk_drv1'] ?? 0) ? 'checked' : ''; ?>
-                                onchange="this.parentNode.classList.toggle('checked', this.checked)"> 西
-                        </label>
-                        <label class="checkbox-item <?php echo ($row['chk_drv2'] ?? 0) ? 'checked' : ''; ?>">
-                            <input type="checkbox" name="chk_drv2" <?php echo ($row['chk_drv2'] ?? 0) ? 'checked' : ''; ?>
-                                onchange="this.parentNode.classList.toggle('checked', this.checked)"> 佐藤
-                        </label>
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <div class="checkbox-row" style="flex-grow:1;">
+                            <label class="checkbox-item <?php echo ($row['chk_drv1'] ?? 0) ? 'checked' : ''; ?>">
+                                <input type="checkbox" name="chk_drv1" <?php echo ($row['chk_drv1'] ?? 0) ? 'checked' : ''; ?>
+                                    onchange="this.parentNode.classList.toggle('checked', this.checked)"> 西
+                            </label>
+                            <label class="checkbox-item <?php echo ($row['chk_drv2'] ?? 0) ? 'checked' : ''; ?>">
+                                <input type="checkbox" name="chk_drv2" <?php echo ($row['chk_drv2'] ?? 0) ? 'checked' : ''; ?>
+                                    onchange="this.parentNode.classList.toggle('checked', this.checked)"> 佐藤
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="margin-left:10px; padding:8px 16px; font-size:0.9rem; min-height:40px;">保存</button>
                     </div>
                 </div>
             </div>
@@ -638,7 +659,7 @@ $pickupTime = $row['pickup_time'] ?? '';
 
             <label>種別</label>
             <div class="type-btns">
-                <?php foreach (['変更', '臨時', '入院', '退院', '連絡事項', '永眠'] as $t): ?>
+                <?php foreach (['変更', '臨時', '入院', '退院', '連絡事項'] as $t): ?>
                     <div class="type-btn <?php echo $row['event_type'] === $t ? 'active' : ''; ?>"
                         data-type="<?php echo $t; ?>" onclick="setType(this)"><?php echo $t; ?></div>
                 <?php endforeach; ?>
@@ -695,14 +716,12 @@ $pickupTime = $row['pickup_time'] ?? '';
 
             <!-- 入院等・連絡事項用 -->
             <div id="date_single"
-                class="<?php echo in_array($row['event_type'], ['入院', '退院', '永眠', '連絡事項']) ? '' : 'hidden'; ?>">
+                class="<?php echo in_array($row['event_type'], ['入院', '退院', '連絡事項']) ? '' : 'hidden'; ?>">
                 <label id="single_label"><?php
                 if ($row['event_type'] === '入院')
                     echo '入院日';
                 elseif ($row['event_type'] === '退院')
                     echo '退院日';
-                elseif ($row['event_type'] === '永眠')
-                    echo '永眠日';
                 else
                     echo '対象日';
                 ?></label>

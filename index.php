@@ -80,7 +80,8 @@ $migCols = [
     "office_staff TEXT",
     "bxp_change TEXT DEFAULT 'なし'",
     "exam_change TEXT DEFAULT 'なし'",
-    "is_handled INTEGER DEFAULT 0"
+    "is_handled INTEGER DEFAULT 0",
+    "is_deleted INTEGER DEFAULT 0"
 ];
 foreach ($migCols as $col) {
     try {
@@ -140,10 +141,12 @@ $sql = "SELECT *,
         ELSE 30
     END as priority_score
     FROM records WHERE 
+    is_deleted = 0 AND (
     (event_type = '連絡事項' AND (chk_drv1 = 0 OR chk_drv2 = 0)) OR
     (event_type != '連絡事項' AND event_type != '入院' AND target_date >= '$today') OR
     (event_type = '入院' AND target_date >= '$today') OR
     (event_type = '変更' AND (orig_date >= '$today' OR target_date >= '$today'))
+    )
     ORDER BY 
     priority_score ASC,
     target_date ASC";
@@ -307,29 +310,22 @@ $records = $pdo->query($sql)->fetchAll();
 
         .flag {
             display: inline-block;
-            padding: 4px 8px;
-            /* パディング増やす */
+            padding: 5px 4px;
             border-radius: 6px;
-            font-size: 0.9rem;
-            /* フォント大きく */
+            font-size: 1.1rem;
             font-weight: 700;
-            margin-right: 2px;
+            margin-right: 1px;
             line-height: 1;
         }
 
         .flag-pickup {
-            background: #dbeafe;
-            color: #1e40af;
+            background: #1d4ed8;
+            color: #ffffff;
         }
 
         .flag-dropoff {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .flag-off {
-            background: #f1f5f9;
-            color: #9ca3af;
+            background: #ea580c;
+            color: #ffffff;
         }
 
         .needs-driver {
@@ -656,6 +652,12 @@ $records = $pdo->query($sql)->fetchAll();
         .menu-item.settings {
             color: var(--slate-600);
         }
+
+        /* 行クリック用 */
+        .clickable-row {
+            cursor: pointer;
+            transition: background-color 0.15s ease;
+        }
     </style>
 </head>
 
@@ -774,7 +776,7 @@ $records = $pdo->query($sql)->fetchAll();
                         $targetDateStr = $row['target_date'] ? date('n/j', strtotime($row['target_date'])) . '(' . h($row['target_weekday']) . ')' : '-';
 
                         $badgeColor = '#3b82f6';
-                        if (in_array($row['event_type'], ['入院', '永眠']))
+                        if ($row['event_type'] === '入院')
                             $badgeColor = '#ef4444';
                         if ($row['event_type'] === '臨時')
                             $badgeColor = '#f97316';
@@ -790,7 +792,7 @@ $records = $pdo->query($sql)->fetchAll();
                         $officeStaff = $row['office_staff'] ?? '';
                         $pickupTime = $row['pickup_time'] ?? '';
                         ?>
-                        <tr class="<?php echo $rowClass; ?>">
+                        <tr class="<?php echo $rowClass; ?> clickable-row" data-href="edit.php?id=<?php echo $row['id']; ?>">
                             <td class="date-cell">
                                 <?php
                                 $origWd = $row['orig_weekday'] ? '(' . h($row['orig_weekday']) . ')' : '';
@@ -830,15 +832,18 @@ $records = $pdo->query($sql)->fetchAll();
                             <td class="name-cell"><?php echo h($row['p_name']); ?></td>
                             <td>
                                 <?php if (!$isNotice): ?>
-                                    <span class="flag <?php echo $needsPickup ? 'flag-pickup' : 'flag-off'; ?>">迎</span>
-                                    <span class="flag <?php echo $needsDropoff ? 'flag-dropoff' : 'flag-off'; ?>">送</span>
+                                    <?php if ($needsPickup): ?><span class="flag flag-pickup">迎</span><?php endif; ?>
+                                    <?php if ($needsDropoff): ?><span class="flag flag-dropoff">送</span><?php endif; ?>
+                                    <?php if (!$needsPickup && !$needsDropoff): ?>-<?php endif; ?>
                                 <?php else: ?>
                                     -
                                 <?php endif; ?>
                             </td>
                             <td>
                                 <?php if ($isNotice): ?>
-                                    -
+                                    <a href="edit.php?id=<?php echo $row['id']; ?>"
+                                        style="display:block; width:100%; height:100%; text-decoration:none; color:var(--primary); font-weight:bold;">編集
+                                        &gt;</a>
                                 <?php elseif ($pickupTime): ?>
                                     <span class="time-display"><?php echo h($pickupTime); ?></span>
                                 <?php elseif (!$needsPickup): ?>
@@ -857,12 +862,13 @@ $records = $pdo->query($sql)->fetchAll();
                             </td>
                             <td>
                                 <div class="action-btns">
+
                                     <?php if ($isNotice): ?>
-                                        <!-- 自動移動のためボタンなし -->
-                                        <span style="font-size:0.75rem; color:var(--slate-400);">サイン後移動</span>
-                                    <?php else: ?>
-                                        <a href="edit.php?id=<?php echo $row['id']; ?>" class="btn btn-edit">編集</a>
-                                        <?php if (in_array($row['event_type'], ['入院', '退院', '永眠']) || ($row['pharmacy_req'] ?? '') === '必要'): ?>
+                                        <!-- 連絡事項用の表示調整 -->
+                                    <?php endif; ?>
+
+                                    <?php if (!$isNotice): ?>
+                                        <?php if (in_array($row['event_type'], ['入院', '退院']) || ($row['pharmacy_req'] ?? '') === '必要'): ?>
                                             <a href="fax.php?id=<?php echo $row['id']; ?>" target="_blank"
                                                 class="btn <?php echo ($row['fax_sent'] ?? 0) ? 'btn-fax-done' : 'btn-fax'; ?>">FAX</a>
                                         <?php endif; ?>
@@ -878,12 +884,9 @@ $records = $pdo->query($sql)->fetchAll();
                                             <a href="parking_notice.php?id=<?php echo $row['id']; ?>" target="_blank"
                                                 class="btn btn-notice" style="background:#f59e0b;">駐車場案内</a>
                                         <?php endif; ?>
-                                        <form method="post" style="display:inline;" onsubmit="return confirm('削除しますか？');">
-                                            <input type="hidden" name="action" value="delete">
-                                            <input type="hidden" name="id" value="<?php echo $row['id']; ?>">
-                                            <button type="submit" class="btn btn-delete">×</button>
-                                        </form>
                                     <?php endif; ?>
+
+
                                 </div>
                             </td>
                         </tr>
@@ -905,6 +908,24 @@ $records = $pdo->query($sql)->fetchAll();
                 el.classList.toggle('checked');
             });
         }
+
+        // 行クリックで編集画面へ遷移（ボタン等は除外）
+        document.addEventListener('DOMContentLoaded', function () {
+            const rows = document.querySelectorAll('.clickable-row');
+            rows.forEach(row => {
+                row.addEventListener('click', function (e) {
+                    // クリックされた要素がリンク、ボタン、フォーム入力要素、またはそれらの子要素の場合は遷移しない
+                    if (e.target.closest('a, button, input, form, select, textarea')) {
+                        return;
+                    }
+
+                    const href = this.dataset.href;
+                    if (href) {
+                        window.location.href = href;
+                    }
+                });
+            });
+        });
     </script>
 
 </body>
