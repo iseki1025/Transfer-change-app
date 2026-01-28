@@ -519,26 +519,42 @@ $records = $pdo->query($sql)->fetchAll();
 
             th,
             td {
-                padding: 12px 4px;
-                /* Padding reduced to prevent overflow */
-                font-size: 0.9rem;
+                padding: 6px 2px;
+                /* さらに詰める */
+                font-size: 0.85rem;
                 white-space: normal;
             }
 
             /* Fix date cell overflow */
             .date-cell {
-                max-width: 140px;
-                overflow: hidden;
+                max-width: 80px;
+                /* 幅を制限 */
+                line-height: 1.1;
+                text-align: center;
+                /* 日付は中央寄せで見やすく */
             }
 
             .date-main {
                 display: block;
-                /* Ensure separate lines */
+                font-size: 0.9rem;
+            }
+
+            .weekday-sm {
+                display: block;
+                /* 改行させる */
+                font-size: 0.75rem;
+                color: var(--slate-600);
+            }
+
+            .schedule-sm {
+                display: block;
+                font-size: 0.75rem;
             }
 
             .arrow {
-                margin: 4px 0;
-                /* Add margin to prevent overlap */
+                margin: 2px 0;
+                font-size: 0.8rem;
+                /* 矢印も小さく */
             }
 
             /* Fix time display font size on mobile if too large */
@@ -691,6 +707,15 @@ $records = $pdo->query($sql)->fetchAll();
                 <div class="menu-dropdown">
                     <a href="hospitalization.php" class="menu-item">入院一覧</a>
                     <a href="archive.php" class="menu-item">過去一覧</a>
+                    <a href="trash.php" class="menu-item" style="color:#ef4444;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-right:4px; vertical-align:text-bottom;">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2">
+                            </path>
+                        </svg>
+                        ゴミ箱
+                    </a>
                     <a href="settings.php" class="menu-item settings">⚙ 設定</a>
                 </div>
             </div>
@@ -808,21 +833,32 @@ $records = $pdo->query($sql)->fetchAll();
                                 $targetSchVal = $row['new_schedule'] ? $row['new_schedule'] : ($row['orig_schedule'] ?? '');
                                 $targetSch = h($targetSchVal);
 
-                                if ($row['event_type'] === '変更'):
-                                    // 変更前の表示: 日付があれば表示
-                                    if ($origD) {
-                                        echo "<div class='date-main'>{$origD}{$origWd}{$origSch}</div>";
-                                    } else {
-                                        // 日付変更なしでスケジュールのみ変更等の場合でもorigを表示すべきか？
-                                        // User request: "1/1(日)AM -> 1/2(月)PM".
-                                        // 日付がない場合(スケジュールのみ変更)は日付はtargetと同じだが...
-                                        // とりあえず元データがあれば表示
-                                        echo "<div class='date-main'>{$origSch}</div>";
+                                // モバイルで見やすくするために構造化
+                                $formatDate = function ($d, $w, $s) {
+                                    // 日付と曜日・時間を分割
+                                    if (!$d && !$s)
+                                        return '';
+
+                                    $html = '';
+                                    if ($d) {
+                                        $html .= "<span class='date-part'>{$d}</span>";
                                     }
+                                    if ($w) {
+                                        $html .= "<span class='weekday-sm'>{$w}</span>";
+                                    }
+                                    if ($s) {
+                                        $html .= "<span class='schedule-sm'>{$s}</span>";
+                                    }
+                                    return "<div class='date-main'>{$html}</div>";
+                                };
+
+                                if ($row['event_type'] === '変更'):
+                                    // 変更前の表示
+                                    echo $formatDate($origD, $origWd, $origSch);
                                     echo "<div class='arrow'>↓</div>";
-                                    echo "<div class='date-main'>{$targetD}{$targetWd}{$targetSch}</div>";
+                                    echo $formatDate($targetD, $targetWd, $targetSchVal); // targetSchVal has raw schedule
                                 else:
-                                    echo "<div class='date-main'>{$targetD}{$targetWd}{$targetSch}</div>";
+                                    echo $formatDate($targetD, $targetWd, $targetSchVal);
                                 endif;
                                 ?>
                             </td>
