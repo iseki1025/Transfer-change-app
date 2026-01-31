@@ -33,7 +33,8 @@ $columns = [
     "self_needs_dropoff INTEGER DEFAULT 1",
     "taxi_needs_dropoff INTEGER DEFAULT 0",
     "event_needs_dropoff INTEGER DEFAULT 0",
-    "exam_date TEXT"
+    "exam_date TEXT",
+    "business_schedule_chk INTEGER DEFAULT 0"
 ];
 foreach ($columns as $col) {
     try {
@@ -89,7 +90,8 @@ $row = [
     'self_needs_dropoff' => 1,
     'taxi_needs_dropoff' => 0,
     'event_needs_dropoff' => 0,
-    'exam_date' => ''
+    "exam_date" => '',
+    "business_schedule_chk" => 0
 ];
 
 if (!$isNew) {
@@ -115,8 +117,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($isNew) {
         $stmt = $pdo->prepare("INSERT INTO records 
-            (p_name, event_type, orig_date, orig_weekday, orig_schedule, target_date, target_weekday, new_schedule, reason, needs_pickup, needs_dropoff, pickup_time, bed_change, bed_no, bxp_change, exam_change, pharmacy_req, pharmacy_date, created_by, technician, office_staff, chk_drv1, chk_drv2, transport_method, self_transport_type, parking_number, self_needs_dropoff, taxi_needs_dropoff, event_needs_dropoff, exam_date) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (p_name, event_type, orig_date, orig_weekday, orig_schedule, target_date, target_weekday, new_schedule, reason, needs_pickup, needs_dropoff, pickup_time, bed_change, bed_no, bxp_change, exam_change, pharmacy_req, pharmacy_date, created_by, technician, office_staff, chk_drv1, chk_drv2, transport_method, self_transport_type, parking_number, self_needs_dropoff, taxi_needs_dropoff, event_needs_dropoff, exam_date, business_schedule_chk) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $_POST['p_name'],
             $_POST['event_type'],
@@ -147,7 +149,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             isset($_POST['self_needs_dropoff']) ? 1 : 0,
             isset($_POST['taxi_needs_dropoff']) ? 1 : 0,
             isset($_POST['event_needs_dropoff']) ? 1 : 0,
-            $_POST['exam_date'] ?? ''
+            $_POST['exam_date'] ?? '',
+            isset($_POST['business_schedule_chk']) ? 1 : 0
         ]);
     } else {
         $stmt = $pdo->prepare("UPDATE records SET 
@@ -159,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             created_by=?, technician=?, office_staff=?,
             chk_drv1=?, chk_drv2=?,
             transport_method=?, self_transport_type=?, parking_number=?, self_needs_dropoff=?,
-            taxi_needs_dropoff=?, event_needs_dropoff=?, exam_date=?
+            taxi_needs_dropoff=?, event_needs_dropoff=?, exam_date=?, business_schedule_chk=?
             WHERE id=?");
         $stmt->execute([
             $_POST['p_name'],
@@ -192,6 +195,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             isset($_POST['taxi_needs_dropoff']) ? 1 : 0,
             isset($_POST['event_needs_dropoff']) ? 1 : 0,
             $_POST['exam_date'] ?? '',
+            isset($_POST['business_schedule_chk']) ? 1 : 0,
             $_POST['id']
         ]);
     }
@@ -833,13 +837,14 @@ $pickupTime = $row['pickup_time'] ?? '';
                     </label>
                 </div>
 
-            <div class="pickup-time-box">
+                    <div class="pickup-time-box">
                     <label>🚗 迎え時間</label>
                     <input type="hidden" name="pickup_time" id="pickup_time" value="<?php echo h($pickupTime); ?>">
                     <div class="time-input-group">
-                        <input type="tel" id="pickup_hour" class="time-part" maxlength="2" inputmode="numeric">
+                        <input type="tel" id="pickup_hour" class="time-part" maxlength="2" inputmode="numeric" placeholder="時">
                         <span class="time-sep">:</span>
-                        <input type="tel" id="pickup_minute" class="time-part" maxlength="2" inputmode="numeric">
+                        <input type="tel" id="pickup_minute" class="time-part" maxlength="2" inputmode="numeric" placeholder="分">
+                        <button type="submit" class="btn btn-primary btn-sm-save">保存</button>
                     </div>
                     <div class="pickup-time-hint">※ 数字のみ入力</div>
             </div>
@@ -848,21 +853,37 @@ $pickupTime = $row['pickup_time'] ?? '';
                         .time-input-group {
                             display: flex;
                             align-items: center;
-                            justify-content: center;
+                            justify-content: flex-start;
                             gap: 5px;
                         }
                         .time-part {
-                            width: 60px !important;
+                            width: 50px !important;
                             text-align: center;
-                            font-size: 1.4rem !important;
-                            padding: 10px 5px !important;
+                            font-size: 1.2rem !important;
+                            padding: 8px 4px !important;
                             border-radius: 8px;
                             border: 1px solid #94a3b8;
                         }
                         .time-sep {
                             font-weight: 700;
-                            font-size: 1.4rem;
+                            font-size: 1.2rem;
                             color: #92400e;
+                        }
+                        .btn-sm-save {
+                            padding: 8px 12px;
+                            font-size: 0.9rem;
+                            border-radius: 8px;
+                            background: linear-gradient(135deg, #3b82f6, #2563eb);
+                            color: white;
+                            border: none;
+                            cursor: pointer;
+                            margin-left: 5px;
+                        }
+                        @media (max-width: 400px) {
+                            .time-part {
+                                width: 45px !important;
+                                font-size: 1.1rem !important;
+                            }
                         }
                     </style>
                     <script>
@@ -953,6 +974,15 @@ $pickupTime = $row['pickup_time'] ?? '';
                             echo 'selected'; ?>>あり</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- 業務スケジュール入力チェック -->
+            <div style="margin-top: 15px;">
+                <label class="checkbox-item <?php echo ($row['business_schedule_chk'] ?? 0) ? 'checked' : ''; ?>">
+                    <input type="checkbox" name="business_schedule_chk" <?php echo ($row['business_schedule_chk'] ?? 0) ? 'checked' : ''; ?>
+                        onchange="this.parentNode.classList.toggle('checked', this.checked)">
+                    業務スケジュール入力チェック
+                </label>
             </div>
 
             <div id="extra_pharmacy" class="<?php echo ($row['pharmacy_req'] ?? '') === '必要' ? '' : 'hidden'; ?>">
