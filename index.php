@@ -169,6 +169,7 @@ $records = $pdo->query($sql)->fetchAll();
             --slate-800: #1e293b;
             --slate-600: #475569;
             --slate-400: #94a3b8;
+            --slate-200: #e2e8f0;
             --slate-100: #f1f5f9;
         }
 
@@ -258,8 +259,7 @@ $records = $pdo->query($sql)->fetchAll();
         td {
             padding: 10px 10px;
             text-align: left;
-            border-bottom: 2px solid var(--slate-400);
-            /* 太めのライン */
+            border-bottom: 1px solid var(--slate-200);
             font-size: 0.8rem;
         }
 
@@ -267,7 +267,7 @@ $records = $pdo->query($sql)->fetchAll();
             background: var(--slate-100);
             font-weight: 700;
             color: var(--slate-600);
-            border-bottom: 2px solid var(--slate-400);
+            border-bottom: 1px solid var(--slate-200);
             font-size: 0.75rem;
             white-space: nowrap;
         }
@@ -528,7 +528,7 @@ $records = $pdo->query($sql)->fetchAll();
 
             /* Row separator for mobile */
             tr {
-                border-bottom: 4px solid var(--slate-300);
+                border-bottom: 1px solid var(--slate-200);
             }
 
 
