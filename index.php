@@ -258,7 +258,7 @@ $records = $pdo->query($sql)->fetchAll();
         td {
             padding: 10px 10px;
             text-align: left;
-            border-bottom: 2px solid var(--slate-300);
+            border-bottom: 2px solid var(--slate-400);
             /* 太めのライン */
             font-size: 0.8rem;
         }
@@ -267,7 +267,7 @@ $records = $pdo->query($sql)->fetchAll();
             background: var(--slate-100);
             font-weight: 700;
             color: var(--slate-600);
-            border-bottom: 2px solid var(--slate-300);
+            border-bottom: 2px solid var(--slate-400);
             font-size: 0.75rem;
             white-space: nowrap;
         }
@@ -522,8 +522,15 @@ $records = $pdo->query($sql)->fetchAll();
                 padding: 6px 2px;
                 /* さらに詰める */
                 font-size: 0.85rem;
+                font-size: 0.85rem;
                 white-space: normal;
             }
+
+            /* Row separator for mobile */
+            tr {
+                border-bottom: 4px solid var(--slate-300);
+            }
+
 
             /* Fix date cell overflow */
             .date-cell {
@@ -749,7 +756,7 @@ $records = $pdo->query($sql)->fetchAll();
                 <thead>
                     <tr>
                         <th>対象日</th>
-                        <th>種別</th>
+
                         <th>患者名</th>
                         <th>送迎</th>
                         <th>迎え時間</th>
@@ -862,10 +869,12 @@ $records = $pdo->query($sql)->fetchAll();
                                 endif;
                                 ?>
                             </td>
-                            <td><span class="type-badge"
-                                    style="background:<?php echo $badgeColor; ?>;"><?php echo h($row['event_type']); ?></span>
+
+                            <td class="name-cell">
+                                <span class="type-badge"
+                                    style="margin-right:4px; vertical-align:middle; background:<?php echo $badgeColor; ?>;"><?php echo h($row['event_type']); ?></span>
+                                <span style="vertical-align:middle;"><?php echo h($row['p_name']); ?></span>
                             </td>
-                            <td class="name-cell"><?php echo h($row['p_name']); ?></td>
                             <td>
                                 <?php if (!$isNotice): ?>
                                     <?php if ($needsPickup): ?><span class="flag flag-pickup">迎</span><?php endif; ?>
